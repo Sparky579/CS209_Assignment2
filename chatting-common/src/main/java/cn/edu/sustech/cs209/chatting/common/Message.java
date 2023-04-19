@@ -40,6 +40,10 @@ public class Message {
         return data;
     }
 
+    public void reviseData() {
+        data = data.replace("惎", "\n");
+    }
+
     public static Message toMessage(String content) {
         String[] split = content.split(":");
         String type = split[0];

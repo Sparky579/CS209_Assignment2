@@ -128,6 +128,7 @@ public class Controller extends Main implements Initializable {
                 }
                 if (newestMessage.startsWith("server")) {
                     Message message = Message.toMessage(newestMessage);
+                    message.reviseData();
                     messageHistory.insertMessage(message.getSendTo(), message);
                     if (!message.getSendTo().equals("All") && !actualChatting.containsValue(message.getSendTo())) {
                         Platform.runLater(() -> chatList.getItems().add(addToActualByActual(message.getSendTo())));
@@ -356,7 +357,7 @@ public class Controller extends Main implements Initializable {
         // TODO
         String msg = inputArea.getText();
         //replace all the \n with space
-        msg = msg.replaceAll("\n", " ");
+        msg = msg.replaceAll("\n", "惎");
         if (msg.isEmpty()) return;
         inputArea.clear();
 //        System.out.println(actualChatting.get(currentChatting.toString()));
