@@ -1,23 +1,24 @@
 package cn.edu.sustech.cs209.chatting.client;
 
 import cn.edu.sustech.cs209.chatting.common.Message;
+import cn.edu.sustech.cs209.chatting.common.Tools;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
-import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
+import java.io.File;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 public class Controller extends Main implements Initializable {
 
@@ -29,6 +30,9 @@ public class Controller extends Main implements Initializable {
 
     @FXML
     ListView<String> chatList;
+
+    @FXML
+    TextArea notifyText;
 
     @FXML
     TextArea inputArea;
@@ -80,6 +84,8 @@ public class Controller extends Main implements Initializable {
         return chatName;
     }
 
+
+
     private String addToActualByActual(String actual) {
         String[] actualSplit = actual.split("@");
         String chatName;
@@ -112,6 +118,10 @@ public class Controller extends Main implements Initializable {
         return chatName;
     }
 
+    public boolean serverAvailable() {
+        return !closeTrigger.get();
+    }
+
     private void setChatBottomLabel() {
         chatBottomLabel.setText("Current User: " + username + " | Current Chatting: " + currentChatting.get());
     }
@@ -119,12 +129,19 @@ public class Controller extends Main implements Initializable {
     //important one! To detect all messages from server
     private void detectChanges() {
         while (true) {
+
             locking = true;
             try {
                 synchronized (condition) {
                     if (locking) {
                         condition.wait();
                     }
+                }
+//                System.out.println("Detecting changes...");
+//                System.out.println(closeTrigger.get());
+                if (closeTrigger.get()) {
+                    notifyText.setText("Server closed!!");
+                    continue;
                 }
                 if (newestMessage.startsWith("server")) {
                     Message message = Message.toMessage(newestMessage);
@@ -136,6 +153,22 @@ public class Controller extends Main implements Initializable {
                     Platform.runLater(() -> {
                         if (getActual().equals(message.getSendTo())) {
                             chatContentList.getItems().add(message);
+                        }
+                        else {
+//                            chatContentList.getItems().set(0,
+//                                    new Message("x", message.getTimestamp(), "server", "All", "New message from " + message.getSendTo()));
+                            if (message.getSendTo().startsWith("FRIEND")) notifyText.setText("New message from " + message.getSentBy() + "\n" + "At time: " + message.getTimestamp());
+                            else if (message.getSendTo().startsWith("GROUP")) {
+                                for (Map.Entry<String, String> entry : actualChatting.entrySet()) {
+                                    if (entry.getValue().equals(message.getSendTo())) {
+                                        notifyText.setText("New message from group: " + entry.getKey() + "\nAt time:" + message.getTimestamp());
+                                        break;
+                                    }
+                                }
+                            }
+                            else {
+                                notifyText.setText("New message from All" + "\n" + "At time: " + message.getTimestamp());
+                            }
                         }
                     });
                 }
@@ -154,29 +187,63 @@ public class Controller extends Main implements Initializable {
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
 
-        Dialog<String> dialog = new TextInputDialog();
-        dialog.setTitle("Login");
+//        Dialog<String> dialog = new TextInputDialog();
+//        dialog.setTitle("Login");
+//        dialog.setHeaderText(null);
+//        dialog.setContentText("Username:");
+
+        TextInputDialog dialog = new TextInputDialog();
         dialog.setHeaderText(null);
         dialog.setContentText("Username:");
+        dialog.setTitle("登录");
+        dialog.setHeaderText("请输入您的账号和密码：");
 
-        Optional<String> input;
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+
+        Label lblUserName = new Label("账号:");
+        TextField txtUserName = new TextField();
+        Label lblPassword = new Label("密码:");
+        PasswordField txtPassword = new PasswordField();
+
+        grid.add(lblUserName, 1, 1);
+        grid.add(txtUserName, 2, 1);
+        grid.add(lblPassword, 1, 2);
+        grid.add(txtPassword, 2, 2);
+
+        dialog.getDialogPane().setContent(grid);
+
+        String input = null;
+        String password = null;
         /*
            TODO: Check if there is a user with the same name among the currently logged-in users,
                  if so, ask the user to change the username
          */
-
+//        dialog.setOnCloseRequest(event -> {
+//            send(new Message("exit", System.currentTimeMillis(), username, "server", username));
+//            Platform.exit();
+//        });
         boolean ok = false;
         while (!ok) {
-            input = dialog.showAndWait();
+            Optional<String> result = dialog.showAndWait();
+            if (result.isPresent()){
+                input = txtUserName.getText();
+                password = txtPassword.getText();
+                // 进行相应的操作
+            }
             //if the user clicks the cancel button, exit the program
 
-            if (!input.isPresent() || input.get().isEmpty()) {
+            //hold on the cancel or exit button
+
+            if (input == null || input.isEmpty()) {
                 System.out.println("Invalid username " + input + ", exiting");
                 send(new Message("exit", System.currentTimeMillis(), username, "server", username));
                 Platform.exit();
             }
-            username = input.get();
-//            send("name:" + username);
+
+            username = input;
             send(new Message("name", System.currentTimeMillis(), username, "server", username));
             locking = true;
             try {
@@ -193,7 +260,7 @@ public class Controller extends Main implements Initializable {
             }
 //            else dialog.setContentText("Username already exists, please change another one:");
         }
-
+        notifyText.setEditable(false);
         chatContentList.setCellFactory(new MessageCellFactory());
         chatContentList.getItems().add(new Message("message", System.currentTimeMillis(),
                 "server", username, "Welcome to the chat room!"));
@@ -230,7 +297,8 @@ public class Controller extends Main implements Initializable {
 
     @FXML
     public void createPrivateChat() {
-        AtomicReference<String> user = new AtomicReference<>();
+
+        if (!serverAvailable()) return;
 
         Stage stage = new Stage();
         ComboBox<String> userSel = new ComboBox<>();
@@ -238,7 +306,7 @@ public class Controller extends Main implements Initializable {
         // FIXME: get the user list from server, the current user's name should be filtered out
         send(new Message("list", System.currentTimeMillis(), username, "server", username));
         locking = true;
-        List users = getUserList();
+        List<String> users = getUserList();
 
         users.forEach(u -> {
             if (!Objects.equals(u, username)) {
@@ -311,6 +379,7 @@ public class Controller extends Main implements Initializable {
      */
     @FXML
     public void createGroupChat() {
+        if (!serverAvailable()) return;
         //create a multi-select list
         Stage stage = new Stage();
         ListView<String> userSel = new ListView<>();
@@ -356,14 +425,29 @@ public class Controller extends Main implements Initializable {
     public void doSendMessage() {
         // TODO
         String msg = inputArea.getText();
-        //replace all the \n with space
-        msg = msg.replaceAll("\n", "惎");
-        if (msg.isEmpty()) return;
         inputArea.clear();
+        //replace all the \n with space
+        msg = msg.replaceAll("\n", Tools.newLine);
+        if (msg.isEmpty()) return;
+        if (msg.replaceAll(Tools.newLine, "").replaceAll(" ", "").isEmpty()) return;
+
 //        System.out.println(actualChatting.get(currentChatting.toString()));
         String actual = getActual();
         Message message = new Message("message", System.currentTimeMillis(), username, actual, msg);
         send(message);
+    }
+
+    @FXML
+    public void doSendFile() {
+        Stage stage = new Stage();
+        File file = GUITools.showFileDialog(stage);
+        try{
+            System.out.println(file.getName());
+        }
+        catch (NullPointerException e) {
+            System.out.println("file does not exist!");
+            return;
+        }
     }
 
     @FXML

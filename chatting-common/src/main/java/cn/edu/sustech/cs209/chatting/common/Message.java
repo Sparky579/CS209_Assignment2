@@ -41,7 +41,7 @@ public class Message {
     }
 
     public void reviseData() {
-        data = data.replace("惎", "\n");
+        data = data.replace(Tools.newLine, "\n");
     }
 
     public static Message toMessage(String content) {

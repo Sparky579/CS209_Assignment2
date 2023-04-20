@@ -10,10 +10,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.ConnectException;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -23,6 +25,12 @@ class ClientThread extends Main implements Runnable{
     public volatile boolean running = true;
     public ClientThread(BufferedReader in) {
         this.in = in;
+    }
+    public void notifyClient() {
+        locking = false;
+        synchronized (condition) {
+            condition.notifyAll();
+        }
     }
     @Override
     public void run() {
@@ -35,14 +43,13 @@ class ClientThread extends Main implements Runnable{
                     System.out.println("Server closed");
                     System.exit(0);
                 }
-                locking = false;
                 newestMessage = line;
-                synchronized (condition) {
-                    condition.notifyAll();
-                }
+                notifyClient();
             }
         } catch (SocketException e) {
             System.out.println("Socket closed");
+            closeTrigger.set(true);
+            notifyClient();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -52,21 +59,31 @@ class ClientThread extends Main implements Runnable{
 public class Main extends Application {
     static PrintWriter out;
     static boolean locking = false;
+    final static AtomicReference<Boolean> closeTrigger = new AtomicReference<>(false);
     public static List<String> messages = new ArrayList<>();
     public static String newestMessage = "";
     static Lock lock = new ReentrantLock();
-    public static Condition condition = lock.newCondition();
+    public static final Condition condition = lock.newCondition();
     public static void main(String[] args) throws IOException {
         new Thread(() -> {
             try {
                 receive();
+            }catch (ConnectException e) {
+                System.out.println("Server not found");
+                System.exit(0);
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
         }).start();
         launch();
     }
 
+    /**
+     * Send a message to the server
+     * @param stage
+     * @throws IOException
+     */
     @Override
     public void start(Stage stage) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("main.fxml"));

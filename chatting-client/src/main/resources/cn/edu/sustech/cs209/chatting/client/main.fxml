@@ -33,9 +33,14 @@
               </Menu>
           </menus>
        </MenuBar>
-       <SplitPane dividerPositions="0.25" focusTraversable="true" VBox.vgrow="ALWAYS">
+       <SplitPane dividerPositions="0.5" focusTraversable="true" VBox.vgrow="ALWAYS">
           <items>
-              <ListView fx:id="chatList" onMouseClicked="#changeChatting" prefHeight="200.0" prefWidth="200.0" />
+            <VBox maxWidth="250.0" prefHeight="200.0" prefWidth="50.0">
+               <children>
+                    <ListView fx:id="chatList" maxWidth="253.0" onMouseClicked="#changeChatting" prefHeight="552.0" prefWidth="253.0" />
+                  <TextArea fx:id="notifyText" prefHeight="128.0" prefWidth="250.0" />
+               </children>
+            </VBox>
               <SplitPane dividerPositions="0.85" orientation="VERTICAL" prefHeight="200.0" prefWidth="160.0">
                  <items>
                      <ListView fx:id="chatContentList" prefHeight="200.0" prefWidth="200.0">
@@ -45,7 +50,8 @@
                      <HBox prefHeight="100.0" prefWidth="200.0">
                         <children>
                             <TextArea fx:id="inputArea" prefHeight="138.0" prefWidth="624.0" HBox.hgrow="ALWAYS" />
-                            <Button maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#doSendMessage" text="Send" HBox.hgrow="ALWAYS" />
+                            <Button maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#doSendMessage" prefHeight="78.0" prefWidth="200.0" text="Send" HBox.hgrow="ALWAYS" />
+                        <Button maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#doSendFile" prefHeight="78.0" prefWidth="200.0" text="File" />
                         </children>
                      </HBox>
                  </items>
