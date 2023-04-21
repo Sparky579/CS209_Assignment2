@@ -15,7 +15,8 @@ import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
-import java.io.File;
+import javax.tools.Tool;
+import java.io.*;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -39,7 +40,6 @@ public class Controller extends Main implements Initializable {
 
     MessageHistory messageHistory = new MessageHistory();
 
-    String username;
 
     AtomicReference<String> currentChatting = new AtomicReference<>("All");
 
@@ -126,7 +126,50 @@ public class Controller extends Main implements Initializable {
         chatBottomLabel.setText("Current User: " + username + " | Current Chatting: " + currentChatting.get());
     }
 
+    private void writeMessageHistory() {
+        try {
+            FileOutputStream fileOut = new FileOutputStream(Tools.getFilePath(userID, "info.ser"));
+//            System.out.println("write");
+            ObjectOutputStream out = new ObjectOutputStream(fileOut);
+            out.writeObject(messageHistory);
+            out.close();
+            fileOut.close();
+        } catch (IOException i) {
+            i.printStackTrace();
+        }
+    }
+
     //important one! To detect all messages from server
+    private void addData(Message message) {
+        message.reviseData();
+        messageHistory.insertMessage(message.getSendTo(), message);
+        writeMessageHistory();
+        if (!message.getSendTo().equals("All") && !actualChatting.containsValue(message.getSendTo())) {
+            Platform.runLater(() -> chatList.getItems().add(addToActualByActual(message.getSendTo())));
+        }
+        Platform.runLater(() -> {
+            if (getActual().equals(message.getSendTo())) {
+                chatContentList.getItems().add(message);
+            }
+            else {
+//                            chatContentList.getItems().set(0,
+//                                    new Message("x", message.getTimestamp(), "server", "All", "New message from " + message.getSendTo()));
+                if (message.getSendTo().startsWith("FRIEND")) notifyText.setText("New message from " + message.getSentBy() + "\n" + "At time: " + message.getTimestamp());
+                else if (message.getSendTo().startsWith("GROUP")) {
+                    for (Map.Entry<String, String> entry : actualChatting.entrySet()) {
+                        if (entry.getValue().equals(message.getSendTo())) {
+                            notifyText.setText("New message from group: " + entry.getKey() + "\nAt time:" + message.getTimestamp());
+                            break;
+                        }
+                    }
+                }
+                else {
+                    notifyText.setText("New message from All" + "\n" + "At time: " + message.getTimestamp());
+                }
+            }
+        });
+    }
+
     private void detectChanges() {
         while (true) {
 
@@ -144,34 +187,12 @@ public class Controller extends Main implements Initializable {
                     continue;
                 }
                 if (newestMessage.startsWith("server")) {
-                    Message message = Message.toMessage(newestMessage);
-                    message.reviseData();
-                    messageHistory.insertMessage(message.getSendTo(), message);
-                    if (!message.getSendTo().equals("All") && !actualChatting.containsValue(message.getSendTo())) {
-                        Platform.runLater(() -> chatList.getItems().add(addToActualByActual(message.getSendTo())));
-                    }
-                    Platform.runLater(() -> {
-                        if (getActual().equals(message.getSendTo())) {
-                            chatContentList.getItems().add(message);
-                        }
-                        else {
-//                            chatContentList.getItems().set(0,
-//                                    new Message("x", message.getTimestamp(), "server", "All", "New message from " + message.getSendTo()));
-                            if (message.getSendTo().startsWith("FRIEND")) notifyText.setText("New message from " + message.getSentBy() + "\n" + "At time: " + message.getTimestamp());
-                            else if (message.getSendTo().startsWith("GROUP")) {
-                                for (Map.Entry<String, String> entry : actualChatting.entrySet()) {
-                                    if (entry.getValue().equals(message.getSendTo())) {
-                                        notifyText.setText("New message from group: " + entry.getKey() + "\nAt time:" + message.getTimestamp());
-                                        break;
-                                    }
-                                }
-                            }
-                            else {
-                                notifyText.setText("New message from All" + "\n" + "At time: " + message.getTimestamp());
-                            }
-                        }
-                    });
+                    addData(Message.toMessage(newestMessage));
                 }
+                if (newestMessage.startsWith("file")) {
+                    Message message = Message.toMessage(newestMessage);
+                    addData(message);
+                    }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -202,6 +223,7 @@ public class Controller extends Main implements Initializable {
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
+
 
         Label lblUserName = new Label("账号:");
         TextField txtUserName = new TextField();
@@ -243,7 +265,36 @@ public class Controller extends Main implements Initializable {
                 Platform.exit();
             }
 
+            if (input.length() < 2 || input.length() > 9) {
+                System.out.println("The length of username should be between 2 and 9");
+                continue;
+            }
+
+            String path = Tools.getFilePath(Tools.toUserID(input), "info.ser");
+//            String path = "data/" + input + "/info.ser";
+
+            if (password == null) password = "";
+
+            try{
+                ObjectInputStream in = new ObjectInputStream(new FileInputStream(path));
+                messageHistory = (MessageHistory) in.readObject();
+                in.close();
+                if (messageHistory.passwordHash != password.hashCode()) continue;
+
+            } catch (FileNotFoundException | ClassNotFoundException f) {
+                //create the file
+                Tools.makeDir(Tools.toUserID(input));
+                messageHistory.passwordHash = password.hashCode();
+                username = input;
+                writeMessageHistory();
+                notifyText.setText("Welcome NEW USER " + username + "!!!");
+//                System.out.println(messageHistory.getHistory("All"));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             username = input;
+            userID = Tools.toUserID(username);
+            chatContentList.getItems().addAll(messageHistory.getHistory("All"));
             send(new Message("name", System.currentTimeMillis(), username, "server", username));
             locking = true;
             try {
@@ -262,8 +313,8 @@ public class Controller extends Main implements Initializable {
         }
         notifyText.setEditable(false);
         chatContentList.setCellFactory(new MessageCellFactory());
-        chatContentList.getItems().add(new Message("message", System.currentTimeMillis(),
-                "server", username, "Welcome to the chat room!"));
+//        chatContentList.getItems().add(new Message("message", System.currentTimeMillis(),
+//                "server", username, "Welcome to the chat room!"));
         chatList.getItems().add("All");
         chatList.getSelectionModel().select(0);
         setChatBottomLabel();
@@ -447,6 +498,10 @@ public class Controller extends Main implements Initializable {
         catch (NullPointerException e) {
             System.out.println("file does not exist!");
             return;
+        }
+        try {
+            sendFile(file, username, getActual());
+        } catch (IOException ignored) {
         }
     }
 

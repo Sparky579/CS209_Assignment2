@@ -9,6 +9,7 @@ import java.util.Map;
 
 public class MessageHistory implements Serializable {
     Map<String, List<Message>> history;
+    int passwordHash;
     public MessageHistory(Map<String, List<Message>> history) {
         this.history = history;
     }

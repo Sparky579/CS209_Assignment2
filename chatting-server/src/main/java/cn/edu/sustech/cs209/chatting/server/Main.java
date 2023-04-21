@@ -2,12 +2,10 @@ package cn.edu.sustech.cs209.chatting.server;
 
 import cn.edu.sustech.cs209.chatting.common.Message;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -98,7 +96,55 @@ class ServerThread extends Main implements Runnable{
                     quit();
                     break;
                 }
+                if (message.getType().equals("file")) {
+                    String to = message.getSendTo();
+                    String from = message.getSentBy();
+                    String msg = message.getData();
+                    long lens = message.getTimestamp();
+                    List<ServerThread> sendList = new ArrayList<>();
+                    for (ServerThread serverThread : serverThreads) {
+                        if (to.contains("@" + serverThread.name + "@") || to.equals("All") || serverThread.name.equals(from)) {
+                            sendList.add(serverThread);
+                        }
+                    }
+                    sendList.forEach(x -> {
+                        Message message1 = new Message("file" + message.getTimestamp(), System.currentTimeMillis(), from, to, msg);
+                        x.out.println(message1);
+                    });
+                    try{
+                        InputStream inputStream = socket.getInputStream();
+//                        FileOutputStream fileOut = new FileOutputStream(msg);
+                        byte[] bytes = new byte[1024];
+
+                        int len;
+                        while ((len = inputStream.read(bytes)) != -1) {
+//                            fileOut.write(bytes, 0, len);
+//                            System.out.println("Received " + len + " bytes");
+                            int finalLen = len;
+                            sendList.forEach(x -> {
+                                try {
+                                    x.socket.getOutputStream().write(bytes, 0, finalLen);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            });
+                            lens -= len;
+                            if (lens <= 0) break;
+                        }
+                        System.out.println("finish transfer");
+                    }
+                    catch (IOException e) {
+                        //e.printStackTrace();
+                        System.out.println("File transfer failed (IO Exception)");
+                    }
+
+
+
+                }
             }
+        }
+        catch (SocketException e) {
+            System.out.println("Socket Exception");
         }
         catch (IOException e) {
             e.printStackTrace();

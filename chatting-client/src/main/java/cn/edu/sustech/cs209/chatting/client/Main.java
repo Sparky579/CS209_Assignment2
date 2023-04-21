@@ -1,15 +1,13 @@
 package cn.edu.sustech.cs209.chatting.client;
 
 import cn.edu.sustech.cs209.chatting.common.Message;
+import cn.edu.sustech.cs209.chatting.common.Tools;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ConnectException;
 import java.net.Socket;
 import java.net.SocketException;
@@ -23,6 +21,7 @@ import java.util.concurrent.locks.ReentrantLock;
 class ClientThread extends Main implements Runnable{
     BufferedReader in;
     public volatile boolean running = true;
+
     public ClientThread(BufferedReader in) {
         this.in = in;
     }
@@ -38,19 +37,54 @@ class ClientThread extends Main implements Runnable{
             while (running) {
                 //if socket is closed, close the thread
                 String line = in.readLine();
-                System.out.println("Received: " + line);
+//                System.out.println("Received: " + line);
                 if (line.equals("Bye")) {
                     System.out.println("Server closed");
                     System.exit(0);
                 }
-                newestMessage = line;
-                notifyClient();
+                else if (line.startsWith("file")) {
+                    Message message = Message.toMessage(line);
+                    long lens = Long.parseLong(message.getType().substring(4));
+                    System.out.println("Receiving file " + message.getData() + " of size " + lens + " bytes");
+                    try {
+
+                        InputStream inputStream = socket.getInputStream();
+//                        FileOutputStream fileOut = new FileOutputStream(msg);
+                        //if the file is not exist, create it
+
+                        File file = Tools.makeFile(userID, message.getData());
+                        OutputStream output = new FileOutputStream(file);
+                        byte[] bytes = new byte[1024];
+                        //store all bytes
+
+                        int len;
+                        while ((len = inputStream.read(bytes)) != -1) {
+                            output.write(bytes, 0, len);
+//                            System.out.println("Writing " + len + " bytes");
+                            lens -= len;
+                            if (lens <= 0) {
+                                break;
+                            }
+                        }
+                        //close the file
+                        output.close();
+                    } catch (IOException e) {
+                        //e.printStackTrace();
+                        System.out.println("File transfer failed (IO Exception)");
+                    }
+                    newestMessage = line;
+                    notifyClient();
+                }
+                else {
+                    newestMessage = line;
+                    notifyClient();
+                }
             }
-        } catch (SocketException e) {
+        }catch(SocketException e){
             System.out.println("Socket closed");
             closeTrigger.set(true);
             notifyClient();
-        } catch (IOException e) {
+        } catch(IOException e){
             e.printStackTrace();
         }
     }
@@ -58,11 +92,13 @@ class ClientThread extends Main implements Runnable{
 
 public class Main extends Application {
     static PrintWriter out;
+    public static String username, userID;
     static boolean locking = false;
     final static AtomicReference<Boolean> closeTrigger = new AtomicReference<>(false);
     public static List<String> messages = new ArrayList<>();
     public static String newestMessage = "";
     static Lock lock = new ReentrantLock();
+    static Socket socket;
     public static final Condition condition = lock.newCondition();
     public static void main(String[] args) throws IOException {
         new Thread(() -> {
@@ -99,7 +135,6 @@ public class Main extends Application {
     }
     public static void receive() throws IOException {
         System.out.println("Starting client");
-        Socket socket = null;
         socket = new Socket("127.0.0.1", 377);
         System.out.println("Client started");
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
@@ -125,5 +160,24 @@ public class Main extends Application {
     }
     protected static void send(Message message) {
         out.println(message.toString());
+    }
+    protected static void sendFile(File file, String userName, String sendTo) throws IOException {
+        send(new Message("file", file.length(), userName, sendTo, file.getName()));
+        byte [] buffer = new byte[1024];
+        int bytesRead;
+        OutputStream socketOut = new DataOutputStream(socket.getOutputStream());
+        InputStream inputStream = new FileInputStream(file);
+        while (true) {
+            try {
+                bytesRead = inputStream.read(buffer);
+                if (bytesRead == -1) {
+                    break;
+                }
+                socketOut.write(buffer, 0, bytesRead);
+//                System.out.println("Sending file: " + bytesRead + " bytes");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
