@@ -37,7 +37,6 @@ class ClientThread extends Main implements Runnable{
             while (running) {
                 //if socket is closed, close the thread
                 String line = in.readLine();
-//                System.out.println("Received: " + line);
                 if (line.equals("Bye")) {
                     System.out.println("Server closed");
                     System.exit(0);
@@ -80,11 +79,11 @@ class ClientThread extends Main implements Runnable{
                     notifyClient();
                 }
             }
-        }catch(SocketException e){
+        } catch (SocketException e){
             System.out.println("Socket closed");
             closeTrigger.set(true);
             notifyClient();
-        } catch(IOException e){
+        } catch (IOException e){
             e.printStackTrace();
         }
     }
@@ -100,6 +99,7 @@ public class Main extends Application {
     static Lock lock = new ReentrantLock();
     static Socket socket;
     public static final Condition condition = lock.newCondition();
+
     public static void main(String[] args) throws IOException {
         new Thread(() -> {
             try {

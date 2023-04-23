@@ -113,7 +113,6 @@ class ServerThread extends Main implements Runnable{
                     });
                     try{
                         InputStream inputStream = socket.getInputStream();
-//                        FileOutputStream fileOut = new FileOutputStream(msg);
                         byte[] bytes = new byte[1024];
 
                         int len;
@@ -157,6 +156,7 @@ class ServerThread extends Main implements Runnable{
 
 public class Main {
     static List<ServerThread> serverThreads = new ArrayList<>();
+
     public static void work() throws IOException {
         ServerSocket serverSocket = new ServerSocket(377);
         System.out.println("Server started");
@@ -169,6 +169,7 @@ public class Main {
             }
         }
     }
+
     public static void main(String[] args) throws IOException {
         new Thread(new Runnable() {
             @Override

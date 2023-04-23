@@ -22,6 +22,7 @@ public class MessageHistory implements Serializable {
         }
         return history.get(name);
     }
+
     public void writeToFile(String filename) throws FileNotFoundException {
         //by serialization
         //if not exist, create a new file
@@ -42,6 +43,7 @@ public class MessageHistory implements Serializable {
         }
 
     }
+
     public static MessageHistory readFromFile(String filename) throws FileNotFoundException {
         FileInputStream underStream = new FileInputStream(filename);
         try {
@@ -52,6 +54,7 @@ public class MessageHistory implements Serializable {
         }
         return null;
     }
+
     public void insertMessage(String name, Message message) {
         List<Message> list = history.computeIfAbsent(name, k -> new ArrayList<>());
         list.add(message);
