@@ -141,6 +141,7 @@ public class Controller extends Main implements Initializable {
 
     //important one! To detect all messages from server
     private void addData(Message message) {
+        System.out.println(message);
         message.reviseData();
         messageHistory.insertMessage(message.getSendTo(), message);
         writeMessageHistory();
@@ -526,6 +527,7 @@ public class Controller extends Main implements Initializable {
 
     @FXML
     public void doSendFile() {
+        if (!serverAvailable()) return;
         Stage stage = new Stage();
         File file = GUITools.showFileDialog(stage);
         try{
