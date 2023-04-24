@@ -15,10 +15,10 @@ import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
-import javax.tools.Tool;
 import java.io.*;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class Controller extends Main implements Initializable {
@@ -218,22 +218,43 @@ public class Controller extends Main implements Initializable {
         dialog.setContentText("Username:");
         dialog.setTitle("登录");
         dialog.setHeaderText("请输入您的账号和密码：");
+        //set the CANCEL button to null
+        dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setVisible(false);
+        //set the action of close button
 
 
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
 
-
+        AtomicBoolean register = new AtomicBoolean(false);
         Label lblUserName = new Label("账号:");
         TextField txtUserName = new TextField();
         Label lblPassword = new Label("密码:");
         PasswordField txtPassword = new PasswordField();
+        Button btnRegister = new Button("切换到注册");
+        //add the buttons to the grid
+        grid.add(btnRegister, 1, 3);
+        btnRegister.setOnAction(event -> {
+            //to do nothing
+            if (register.get()) {
+                dialog.setTitle("登录");
+                dialog.setHeaderText("请输入您的账号和密码：");
+                btnRegister.setText("切换到注册");
+                register.set(false);
+            } else {
+                dialog.setTitle("注册");
+                dialog.setHeaderText("请输入您的账号和密码：");
+                btnRegister.setText("切换到登录");
+                register.set(true);
+            }
+        });
 
         grid.add(lblUserName, 1, 1);
         grid.add(txtUserName, 2, 1);
         grid.add(lblPassword, 1, 2);
         grid.add(txtPassword, 2, 2);
+
 
         dialog.getDialogPane().setContent(grid);
 
@@ -263,13 +284,14 @@ public class Controller extends Main implements Initializable {
                 System.out.println("Invalid username " + input + ", exiting");
                 send(new Message("exit", System.currentTimeMillis(), username, "server", username));
                 Platform.exit();
+                System.exit(0);
             }
 
             if (input.length() < 2 || input.length() > 9) {
+                dialog.setTitle("名字长度应该在2-9之间");
                 System.out.println("The length of username should be between 2 and 9");
                 continue;
             }
-
             String path = Tools.getFilePath(Tools.toUserID(input), "info.ser");
 //            String path = "data/" + input + "/info.ser";
 
@@ -277,15 +299,27 @@ public class Controller extends Main implements Initializable {
 
             try{
                 ObjectInputStream in = new ObjectInputStream(new FileInputStream(path));
+                if (register.get()) {
+                    dialog.setTitle("账号已存在");
+                    continue;
+                }
                 messageHistory = (MessageHistory) in.readObject();
                 in.close();
-                if (messageHistory.passwordHash != password.hashCode()) continue;
+                if (messageHistory.passwordHash != password.hashCode()) {
+                    dialog.setTitle("密码错误");
+                    continue;
+                }
 
             } catch (FileNotFoundException | ClassNotFoundException f) {
+                if (!register.get()) {
+                    dialog.setTitle("账号不存在");
+                    continue;
+                }
                 //create the file
                 Tools.makeDir(Tools.toUserID(input));
                 messageHistory.passwordHash = password.hashCode();
                 username = input;
+                userID = Tools.toUserID(username);
                 writeMessageHistory();
                 notifyText.setText("Welcome NEW USER " + username + "!!!");
 //                System.out.println(messageHistory.getHistory("All"));
@@ -309,6 +343,8 @@ public class Controller extends Main implements Initializable {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+            dialog.setTitle("已经登录");
+
 //            else dialog.setContentText("Username already exists, please change another one:");
         }
         notifyText.setEditable(false);
