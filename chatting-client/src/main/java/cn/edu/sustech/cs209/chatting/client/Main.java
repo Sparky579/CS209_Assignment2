@@ -91,6 +91,7 @@ class ClientThread extends Main implements Runnable{
 
 public class Main extends Application {
     static PrintWriter out;
+
     public static String username, userID;
     static boolean locking = false;
     final static AtomicReference<Boolean> closeTrigger = new AtomicReference<>(false);
@@ -112,6 +113,7 @@ public class Main extends Application {
             }
 
         }).start();
+//        System.out.println("说的 client");
         launch();
     }
 
@@ -175,8 +177,12 @@ public class Main extends Application {
                 }
                 socketOut.write(buffer, 0, bytesRead);
 //                System.out.println("Sending file: " + bytesRead + " bytes");
-            } catch (IOException e) {
-                e.printStackTrace();
+            }
+            catch (SocketException e){
+//                System.out.println("Socket is already closed!");
+            }
+            catch (IOException e) {
+//                e.printStackTrace();
             }
         }
     }
